@@ -1,1 +1,49 @@
+-- schema.sql
+CREATE DATABASE IF NOT EXISTS hoteldb;
+USE hoteldb;
+
+CREATE TABLE cliente (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(100) NOT NULL,
+  email VARCHAR(100),
+  telefone VARCHAR(20)
+);
+
+CREATE TABLE quarto (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  numero VARCHAR(10) NOT NULL UNIQUE,
+  tipo VARCHAR(50),
+  preco DECIMAL(10,2) NOT NULL,
+  quantidade INT NOT NULL DEFAULT 1
+);
+
+CREATE TABLE reserva (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  cliente_id INT NOT NULL,
+  data_reserva DATE NOT NULL,
+  data_checkin DATE,
+  data_checkout DATE,
+  status VARCHAR(20) DEFAULT 'PENDENTE',
+  FOREIGN KEY (cliente_id) REFERENCES cliente(id) ON DELETE CASCADE
+);
+
+CREATE TABLE reserva_item (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  reserva_id INT NOT NULL,
+  quarto_id INT NOT NULL,
+  quantidade INT NOT NULL DEFAULT 1,
+  preco_unitario DECIMAL(10,2) NOT NULL,
+  FOREIGN KEY (reserva_id) REFERENCES reserva(id) ON DELETE CASCADE,
+  FOREIGN KEY (quarto_id) REFERENCES quarto(id)
+);
+
+-- Dados iniciais
+INSERT INTO cliente (nome, email, telefone) VALUES
+('Maria Silva','maria@example.com','11999990000'),
+('João Souza','joao@example.com','21988880000');
+
+INSERT INTO quarto (numero, tipo, preco, quantidade) VALUES
+('101','Single',150.00,2),
+('102','Double',230.00,3),
+('201','Suite',500.00,1);
 
