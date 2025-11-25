@@ -1,1 +1,205 @@
-Diogo Paviatto Silva
+
+
+Sistema de Reservas de Hotel
+Trabalho Final – Programação Orientada a Objetos em Java
+
+Aluno: Diogo Paviatto Silva
+Professor: Samuel Zanferdini Oliva
+Curso: Programaçao orientada a objetos em java 
+Instituição: Estacio
+Data: 24/11/2025
+
+1. INTRODUÇÃO
+
+Este trabalho apresenta o desenvolvimento de um Sistema de Reservas de Hotel, utilizando os conceitos fundamentais de Programação Orientada a Objetos em Java (POO).
+
+O objetivo foi criar um sistema simples, porém completo, envolvendo:
+
+Classes e objetos representando clientes, quartos e reservas;
+
+CRUD integrado ao banco de dados MySQL usando JDBC;
+
+Herança, polimorfismo e encapsulamento;
+
+Thread executando verificação periódica;
+
+Exceção personalizada para validar regras de negócio.
+
+A proposta é simular uma pequena aplicação de gerenciamento de hotel, capaz de cadastrar quartos, listar e registrar reservas e realizar operações básicas de banco de dados.
+
+2. DESCRIÇÃO DO SISTEMA
+
+O sistema foi dividido em quatro partes principais:
+
+. Cadastro de Clientes
+
+Permite inserir e consultar informações básicas como nome, telefone e e-mail.
+
+. Cadastro de Quartos
+
+Uso completo do CRUD: inserir, listar, editar e remover.
+
+. Reservas
+
+Cadastro de reservas com itens (quartos), preço e datas.
+
+. Verificador Automático de Reservas Atrasadas
+
+Uma thread executa a cada 10 segundos verificando (simulação) reservas com check-in atrasado.
+
+3. REQUISITOS DO TRABALHO E COMO FORAM ATENDIDOS
+Classes e Objetos
+
+Foram criadas classes representando entidades reais:
+
+Cliente
+
+Quarto
+
+Reserva
+
+ReservaItem
+
+Funcionario (e subclasses)
+
+Cada classe possui atributos privados e métodos especializados.
+
+Encapsulamento
+
+Todos os atributos são privados e acessados via getters e setters.
+Exemplo:
+
+public void setPreco(double preco) {
+    if (preco < 0) throw new IllegalArgumentException("Preço não pode ser negativo.");
+    this.preco = preco;
+}
+
+Herança
+
+Classe abstrata:
+
+public abstract class Funcionario
+
+
+Subclasses:
+
+Recepcionista
+
+Gerente
+
+Polimorfismo
+
+Método sobrescrito em cada tipo de funcionário:
+
+@Override
+public double calcularComissao(double valor) {
+    return valor * 0.10;
+}
+
+
+Enquanto o recepcionista usa 3%.
+
+Também é possível armazenar ambos numa lista:
+
+List<Funcionario> funcionarios;
+
+Exceções
+
+Foi criada uma exceção personalizada:
+
+public class DisponibilidadeInsuficienteException extends Exception {
+    public DisponibilidadeInsuficienteException(String msg) {
+        super(msg);
+    }
+}
+
+
+Utilizada para impedir reservas acima da quantidade de quartos disponíveis.
+
+Threads
+
+Foi criada a classe VerificadorReservasThread:
+
+public class VerificadorReservasThread extends Thread {
+    public void run() {
+        while (true) {
+            System.out.println("Verificando reservas atrasadas...");
+            Thread.sleep(10000);
+        }
+    }
+}
+
+Integração com Banco de Dados (JDBC)
+
+O sistema se conecta ao MySQL através da classe DBUtil:
+
+Connection conn = DriverManager.getConnection(URL, USER, PASS);
+
+
+CRUD implementado com PreparedStatement, por exemplo:
+
+String sql = "INSERT INTO quarto (numero, tipo, preco, quantidade) VALUES (?, ?, ?, ?)";
+PreparedStatement ps = conn.prepareStatement(sql);
+
+4 ARQUITETURA DO SISTEMA
+src/
+  app/
+    App.java
+  model/
+    Cliente.java
+    Quarto.java
+    Reserva.java
+    ReservaItem.java
+    Funcionario.java
+    Recepcionista.java
+    Gerente.java
+  dao/
+    ClienteDAO.java
+    QuartoDAO.java
+    ReservaDAO.java
+  util/
+    DBUtil.java
+  exceptions/
+    DisponibilidadeInsuficienteException.java
+  threads/
+    VerificadorReservasThread.java
+
+
+A divisão por pacotes facilita manutenção e organização.
+
+5 PRINCIPAIS TRECHOS DE CÓDIGO
+Classe Quarto (encapsulamento)
+private double preco;
+
+public void setPreco(double preco) {
+    if (preco < 0) throw new IllegalArgumentException("Preço não pode ser negativo.");
+    this.preco = preco;
+}
+
+Herança + Polimorfismo
+public class Gerente extends Funcionario {
+    @Override
+    public double calcularComissao(double valor) {
+        return valor * 0.10;
+    }
+}
+
+Exceção personalizada
+if (quarto.getQuantidade() < solicitada)
+    throw new DisponibilidadeInsuficienteException("Quartos insuficientes!");
+
+Thread
+while (ativo) {
+    System.out.println("[Verificador] Checando reservas...");
+    Thread.sleep(10000);
+}
+
+Comando SQL (PreparedStatement)
+String sql = "SELECT * FROM quarto";
+PreparedStatement ps = conn.prepareStatement(sql);
+ResultSet rs = ps.executeQuery();
+
+6 CONCLUSÃO
+O desenvolvimento do Sistema de Reservas de Hotel permitiu aplicar de maneira prática todos os conceitos da disciplina de Programação Orientada a Objetos, incluindo encapsulamento, herança, polimorfismo, exceções personalizadas, threads e integração com banco de dados via JDBC.
+a parte mais dificil foi a Configuração do JDBC e conexão com o MySQL, organização dos pacotes e classes, oincronização e execução da thread de verificação.
+
