@@ -1,4 +1,27 @@
--- schema.sql
+Estrutura
+src/
+  app/
+    App.java
+  model/
+    Cliente.java
+    Quarto.java
+    Reserva.java
+    ReservaItem.java
+    Funcionario.java
+    Recepcionista.java
+    Gerente.java
+  dao/
+    ClienteDAO.java
+    QuartoDAO.java
+    ReservaDAO.java
+  util/
+    DBUtil.java
+  exceptions/
+    DisponibilidadeInsuficienteException.java
+  threads/
+    VerificadorReservasThread.java
+
+Script SQL
 CREATE DATABASE IF NOT EXISTS hoteldb;
 USE hoteldb;
 
@@ -47,3 +70,514 @@ INSERT INTO quarto (numero, tipo, preco, quantidade) VALUES
 ('102','Double',230.00,3),
 ('201','Suite',500.00,1);
 
+Código Java
+
+package util;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class DBUtil {
+    private static final String URL = "jdbc:mysql://localhost:3306/hoteldb?useSSL=false&serverTimezone=UTC";
+    private static final String USER = "root";
+    private static final String PASS = "sua_senha";
+
+    static {
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+        } catch (ClassNotFoundException e) {
+            System.err.println("Driver JDBC não encontrado: " + e.getMessage());
+        }
+    }
+
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(URL, USER, PASS);
+    }
+}
+
+
+package model;
+
+public class Cliente {
+    private int id;
+    private String nome;
+    private String email;
+    private String telefone;
+
+    public Cliente() {}
+
+    public Cliente(int id, String nome, String email, String telefone) {
+        this.id = id;
+        this.nome = nome;
+        this.email = email;
+        this.telefone = telefone;
+    }
+
+    // getters e setters com validação simples
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+
+    public String getNome() { return nome; }
+    public void setNome(String nome) {
+        if (nome == null || nome.trim().isEmpty()) throw new IllegalArgumentException("Nome não pode ser vazio.");
+        this.nome = nome;
+    }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public String getTelefone() { return telefone; }
+    public void setTelefone(String telefone) { this.telefone = telefone; }
+
+    @Override
+    public String toString() {
+        return "Cliente{" + "id=" + id + ", nome='" + nome + '\'' + ", email='" + email + '\'' + ", telefone='" + telefone + '\'' + '}';
+    }
+}
+
+package model;
+
+public class Quarto {
+    private int id;
+    private String numero;
+    private String tipo;
+    private double preco;
+    private int quantidade; // estoque: quantos quartos daquele tipo/numero estão disponíveis
+
+    public Quarto() {}
+
+    public Quarto(int id, String numero, String tipo, double preco, int quantidade) {
+        this.id = id;
+        this.numero = numero;
+        this.tipo = tipo;
+        setPreco(preco);
+        setQuantidade(quantidade);
+    }
+
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+
+    public String getNumero() { return numero; }
+    public void setNumero(String numero) { this.numero = numero; }
+
+    public String getTipo() { return tipo; }
+    public void setTipo(String tipo) { this.tipo = tipo; }
+
+    public double getPreco() { return preco; }
+    public void setPreco(double preco) {
+        if (preco < 0) throw new IllegalArgumentException("Preço não pode ser negativo.");
+        this.preco = preco;
+    }
+
+    public int getQuantidade() { return quantidade; }
+    public void setQuantidade(int quantidade) {
+        if (quantidade < 0) throw new IllegalArgumentException("Quantidade não pode ser negativa.");
+        this.quantidade = quantidade;
+    }
+
+    @Override
+    public String toString() {
+        return "Quarto{" + "id=" + id + ", numero='" + numero + '\'' + ", tipo='" + tipo + '\'' + ", preco=" + preco + ", quantidade=" + quantidade + '}';
+    }
+}
+
+package model;
+
+public class ReservaItem {
+    private int id;
+    private Quarto quarto;
+    private int quantidade;
+    private double precoUnitario;
+
+    public ReservaItem() {}
+
+    public ReservaItem(Quarto quarto, int quantidade) {
+        this.quarto = quarto;
+        this.quantidade = quantidade;
+        this.precoUnitario = quarto.getPreco();
+    }
+
+    // getters e setters
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+
+    public Quarto getQuarto() { return quarto; }
+    public void setQuarto(Quarto quarto) { this.quarto = quarto; }
+
+    public int getQuantidade() { return quantidade; }
+    public void setQuantidade(int quantidade) { this.quantidade = quantidade; }
+
+    public double getPrecoUnitario() { return precoUnitario; }
+    public void setPrecoUnitario(double precoUnitario) { this.precoUnitario = precoUnitario; }
+
+    @Override
+    public String toString() {
+        return "ReservaItem{" + "quarto=" + quarto + ", quantidade=" + quantidade + ", precoUnitario=" + precoUnitario + '}';
+    }
+}
+
+package model;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Reserva {
+    private int id;
+    private Cliente cliente;
+    private LocalDate dataReserva;
+    private LocalDate dataCheckin;
+    private LocalDate dataCheckout;
+    private String status;
+    private List<ReservaItem> itens = new ArrayList<>();
+
+    public Reserva() {}
+
+    public Reserva(Cliente cliente, LocalDate dataReserva) {
+        this.cliente = cliente;
+        this.dataReserva = dataReserva;
+        this.status = "PENDENTE";
+    }
+
+    // getters e setters
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+
+    public Cliente getCliente() { return cliente; }
+    public void setCliente(Cliente cliente) { this.cliente = cliente; }
+
+    public LocalDate getDataReserva() { return dataReserva; }
+    public void setDataReserva(LocalDate dataReserva) { this.dataReserva = dataReserva; }
+
+    public LocalDate getDataCheckin() { return dataCheckin; }
+    public void setDataCheckin(LocalDate dataCheckin) { this.dataCheckin = dataCheckin; }
+
+    public LocalDate getDataCheckout() { return dataCheckout; }
+    public void setDataCheckout(LocalDate dataCheckout) { this.dataCheckout = dataCheckout; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public List<ReservaItem> getItens() { return itens; }
+    public void addItem(ReservaItem item) { this.itens.add(item); }
+
+    @Override
+    public String toString() {
+        return "Reserva{" + "id=" + id + ", cliente=" + cliente + ", dataReserva=" + dataReserva + ", status=" + status + ", itens=" + itens + '}';
+    }
+}
+Herança e Polimorfismo
+package model;
+
+public abstract class Funcionario {
+    private int id;
+    private String nome;
+    private double salarioBase;
+
+    public Funcionario() {}
+    public Funcionario(int id, String nome, double salarioBase) {
+        this.id = id; this.nome = nome; this.salarioBase = salarioBase;
+    }
+
+    public int getId() { return id; }
+    public String getNome() { return nome; }
+    public double getSalarioBase() { return salarioBase; }
+
+    public void setNome(String nome) { this.nome = nome; }
+    public void setSalarioBase(double salarioBase) { this.salarioBase = salarioBase; }
+
+    // método que será sobrescrito
+    public abstract double calcularComissao(double valorVendas);
+
+    @Override
+    public String toString() {
+        return "Funcionario{" + "id=" + id + ", nome='" + nome + '\'' + ", salarioBase=" + salarioBase + '}';
+    }
+}
+package model;
+
+public class Recepcionista extends Funcionario {
+    public Recepcionista(int id, String nome, double salarioBase) {
+        super(id, nome, salarioBase);
+    }
+
+    @Override
+    public double calcularComissao(double valorVendas) {
+        // recepcionista tem comissão menor
+        return valorVendas * 0.03;
+    }
+}
+package model;
+
+public class Gerente extends Funcionario {
+    public Gerente(int id, String nome, double salarioBase) {
+        super(id, nome, salarioBase);
+    }
+
+    @Override
+    public double calcularComissao(double valorVendas) {
+        // gerente pode ter comissão maior
+        return valorVendas * 0.10;
+    }
+}
+Exceção
+package exceptions;
+
+public class DisponibilidadeInsuficienteException extends Exception {
+    public DisponibilidadeInsuficienteException(String mensagem) {
+        super(mensagem);
+    }
+}
+package dao;
+
+import model.Quarto;
+import util.DBUtil;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class QuartoDAO {
+
+    public void inserir(Quarto q) throws SQLException {
+        String sql = "INSERT INTO quarto (numero, tipo, preco, quantidade) VALUES (?, ?, ?, ?)";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, q.getNumero());
+            ps.setString(2, q.getTipo());
+            ps.setDouble(3, q.getPreco());
+            ps.setInt(4, q.getQuantidade());
+            ps.executeUpdate();
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                if (rs.next()) q.setId(rs.getInt(1));
+            }
+        }
+    }
+
+    public List<Quarto> listarTodos() throws SQLException {
+        List<Quarto> lista = new ArrayList<>();
+        String sql = "SELECT * FROM quarto";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                Quarto q = new Quarto(
+                        rs.getInt("id"),
+                        rs.getString("numero"),
+                        rs.getString("tipo"),
+                        rs.getDouble("preco"),
+                        rs.getInt("quantidade")
+                );
+                lista.add(q);
+            }
+        }
+        return lista;
+    }
+
+    public Quarto buscarPorId(int id) throws SQLException {
+        String sql = "SELECT * FROM quarto WHERE id = ?";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new Quarto(
+                        rs.getInt("id"),
+                        rs.getString("numero"),
+                        rs.getString("tipo"),
+                        rs.getDouble("preco"),
+                        rs.getInt("quantidade")
+                    );
+                }
+            }
+        }
+        return null;
+    }
+
+    public void atualizar(Quarto q) throws SQLException {
+        String sql = "UPDATE quarto SET numero=?, tipo=?, preco=?, quantidade=? WHERE id=?";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, q.getNumero());
+            ps.setString(2, q.getTipo());
+            ps.setDouble(3, q.getPreco());
+            ps.setInt(4, q.getQuantidade());
+            ps.setInt(5, q.getId());
+            ps.executeUpdate();
+        }
+    }
+
+    public void remover(int id) throws SQLException {
+        String sql = "DELETE FROM quarto WHERE id = ?";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            ps.executeUpdate();
+        }
+    }
+}
+DAO Reserva
+package dao;
+
+import model.Cliente;
+import model.Quarto;
+import model.Reserva;
+import model.ReservaItem;
+import util.DBUtil;
+
+import java.sql.*;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ReservaDAO {
+
+    public int inserir(Reserva reserva) throws SQLException {
+        String sql = "INSERT INTO reserva (cliente_id, data_reserva, data_checkin, data_checkout, status) VALUES (?, ?, ?, ?, ?)";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setInt(1, reserva.getCliente().getId());
+            ps.setDate(2, Date.valueOf(reserva.getDataReserva()));
+            ps.setDate(3, reserva.getDataCheckin() != null ? Date.valueOf(reserva.getDataCheckin()) : null);
+            ps.setDate(4, reserva.getDataCheckout() != null ? Date.valueOf(reserva.getDataCheckout()) : null);
+            ps.setString(5, reserva.getStatus());
+            ps.executeUpdate();
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                if (rs.next()) {
+                    int idGerado = rs.getInt(1);
+                    // inserir itens
+                    inserirItens(conn, idGerado, reserva.getItens());
+                    return idGerado;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private void inserirItens(Connection conn, int reservaId, List<ReservaItem> itens) throws SQLException {
+        String sql = "INSERT INTO reserva_item (reserva_id, quarto_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (ReservaItem it : itens) {
+                ps.setInt(1, reservaId);
+                ps.setInt(2, it.getQuarto().getId());
+                ps.setInt(3, it.getQuantidade());
+                ps.setDouble(4, it.getPrecoUnitario());
+                ps.executeUpdate();
+            }
+        }
+    }
+
+    public List<Reserva> listarTodos() throws SQLException {
+        List<Reserva> lista = new ArrayList<>();
+        String sql = "SELECT r.*, c.nome as cliente_nome, c.email as cliente_email, c.telefone as cliente_tel FROM reserva r JOIN cliente c on r.cliente_id = c.id";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                Reserva r = new Reserva();
+                r.setId(rs.getInt("id"));
+                Cliente c = new Cliente();
+                c.setId(rs.getInt("cliente_id"));
+                c.setNome(rs.getString("cliente_nome"));
+                c.setEmail(rs.getString("cliente_email"));
+                c.setTelefone(rs.getString("cliente_tel"));
+                r.setCliente(c);
+                r.setDataReserva(rs.getDate("data_reserva").toLocalDate());
+                Date dci = rs.getDate("data_checkin");
+                if (dci != null) r.setDataCheckin(dci.toLocalDate());
+                Date dco = rs.getDate("data_checkout");
+                if (dco != null) r.setDataCheckout(dco.toLocalDate());
+                r.setStatus(rs.getString("status"));
+                // não carregamos itens para simplicidade
+                lista.add(r);
+            }
+        }
+        return lista;
+    }
+}
+verificador de reservas
+package threads;
+
+import java.time.LocalDate;
+
+public class VerificadorReservasThread extends Thread {
+    private volatile boolean ativo = true;
+
+    @Override
+    public void run() {
+        while (ativo) {
+            try {
+                // Aqui você chamaria um DAO para verificar reservas — demo com mensagem
+                System.out.println("[Verificador] Checando reservas: " + LocalDate.now());
+                // Simula checagem e relatório
+                // Ex.: reservasDAO.verificarAtrasadas();
+                Thread.sleep(10_000); // dorme 10s (apenas demo)
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                System.out.println("[Verificador] Interrompido");
+            } catch (Exception e) {
+                System.err.println("[Verificador] Erro: " + e.getMessage());
+            }
+        }
+    }
+
+    public void parar() {
+        ativo = false;
+        this.interrupt();
+    }
+}
+App principal
+package app;
+
+import dao.QuartoDAO;
+import model.Quarto;
+import threads.VerificadorReservasThread;
+
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Scanner;
+
+public class App {
+    public static void main(String[] args) {
+        VerificadorReservasThread vt = new VerificadorReservasThread();
+        vt.start();
+
+        Scanner sc = new Scanner(System.in);
+        QuartoDAO qdao = new QuartoDAO();
+
+        while (true) {
+            System.out.println("\n1) Listar quartos\n2) Inserir quarto\n0) Sair");
+            System.out.print("> ");
+            String opc = sc.nextLine();
+            try {
+                if ("1".equals(opc)) {
+                    List<Quarto> lista = qdao.listarTodos();
+                    lista.forEach(System.out::println);
+                } else if ("2".equals(opc)) {
+                    System.out.print("Número: "); String numero = sc.nextLine();
+                    System.out.print("Tipo: "); String tipo = sc.nextLine();
+                    System.out.print("Preço: "); double preco = Double.parseDouble(sc.nextLine());
+                    System.out.print("Quantidade: "); int q = Integer.parseInt(sc.nextLine());
+                    Quarto quarto = new Quarto(0, numero, tipo, preco, q);
+                    qdao.inserir(quarto);
+                    System.out.println("Inserido: " + quarto);
+                } else if ("0".equals(opc)) {
+                    System.out.println("Saindo...");
+                    vt.parar();
+                    break;
+                }
+            } catch (SQLException ex) {
+                System.err.println("Erro SQL: " + ex.getMessage());
+            } catch (NumberFormatException ex) {
+                System.err.println("Número inválido: " + ex.getMessage());
+            } catch (Exception ex) {
+                System.err.println("Erro: " + ex.getMessage());
+            }
+        }
+        sc.close();
+    }
+}
+Tratamento de exceções
+if (quarto.getQuantidade() < quantidadeSolicitada) {
+    throw new DisponibilidadeInsuficienteException("Não há quartos suficientes do tipo " + quarto.getNumero());
